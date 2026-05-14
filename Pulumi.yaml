@@ -1,0 +1,11 @@
+name: test-cluster
+runtime:
+  name: python
+  options:
+    toolchain: uv
+    virtualenv: .venv
+description: Multi-environment Kubernetes bootstrap for minikube, GKE, and EKS with Argo CD.
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: kubernetes-python

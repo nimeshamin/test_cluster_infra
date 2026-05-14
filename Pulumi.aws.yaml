@@ -1,0 +1,12 @@
+config:
+  test-cluster:target: aws
+  test-cluster:clusterName: test-cluster-aws
+  test-cluster:kubernetesVersion: "1.35"
+  test-cluster:baseRepoUrl: https://github.com/PLACEHOLDER/test_cluster_k8s_base.git
+  test-cluster:appRepoUrl: https://github.com/PLACEHOLDER/test_cluster_k8s_app.git
+  test-cluster:awsNodeInstanceType: t3.xlarge
+  test-cluster:awsNodeMinCount: "2"
+  test-cluster:awsNodeMaxCount: "4"
+  test-cluster:awsEndpointPublicAccessCidrs:
+    - 0.0.0.0/0
+  aws:region: us-west-2

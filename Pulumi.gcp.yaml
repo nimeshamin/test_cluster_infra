@@ -1,0 +1,13 @@
+config:
+  test-cluster:target: gcp
+  test-cluster:clusterName: test-cluster-gcp
+  test-cluster:baseRepoUrl: https://github.com/PLACEHOLDER/test_cluster_k8s_base.git
+  test-cluster:appRepoUrl: https://github.com/PLACEHOLDER/test_cluster_k8s_app.git
+  test-cluster:gcpLocation: us-central1
+  test-cluster:gcpNodeMachineType: e2-standard-4
+  test-cluster:gcpNodeMinCount: "2"
+  test-cluster:gcpNodeMaxCount: "4"
+  test-cluster:gcpMasterAuthorizedCidrBlocks:
+    - name: local-admin
+      cidrBlock: 0.0.0.0/0
+  gcp:region: us-central1
