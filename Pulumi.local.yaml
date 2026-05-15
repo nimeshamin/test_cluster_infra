@@ -8,3 +8,4 @@ config:
   test-cluster:minikubeNodes: "2"
   test-cluster:minikubeCpus: "4"
   test-cluster:minikubeMemory: 7168
+  test-cluster:minikubeGpu: "true"

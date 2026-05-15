@@ -7,6 +7,10 @@ config:
   test-cluster:awsNodeInstanceType: t3.xlarge
   test-cluster:awsNodeMinCount: "2"
   test-cluster:awsNodeMaxCount: "4"
+  test-cluster:awsGpuNodeGroupEnabled: "true"
+  test-cluster:awsGpuInstanceType: g4dn.xlarge
+  test-cluster:awsGpuNodeMinCount: "0"
+  test-cluster:awsGpuNodeMaxCount: "1"
   test-cluster:awsEndpointPublicAccessCidrs:
     - 0.0.0.0/0
   aws:region: us-west-2

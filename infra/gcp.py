@@ -187,6 +187,51 @@ def create_gke_cluster(cfg: ClusterConfig) -> KubernetesCluster:
 
     node_pool = gcp.container.NodePool("gke-node-pool", **node_pool_args)
 
+    gke_depends_on: list[pulumi.Resource] = [cluster, node_pool]
+
+    if cfg.gcp_gpu_node_pool_enabled:
+        gpu_node_pool_args = {
+            "name": "gpu",
+            "cluster": cluster.name,
+            "location": cfg.gcp_location,
+            "node_count": cfg.gcp_gpu_node_min_count,
+            "autoscaling": {
+                "min_node_count": cfg.gcp_gpu_node_min_count,
+                "max_node_count": cfg.gcp_gpu_node_max_count,
+            },
+            "management": {"auto_repair": True, "auto_upgrade": True},
+            "upgrade_settings": {"max_surge": 1, "max_unavailable": 0},
+            "node_config": {
+                "machine_type": cfg.gcp_gpu_machine_type,
+                "disk_size_gb": 100,
+                "disk_type": "pd-balanced",
+                "image_type": "COS_CONTAINERD",
+                "service_account": node_service_account.email,
+                "oauth_scopes": ["https://www.googleapis.com/auth/cloud-platform"],
+                "metadata": {"disable-legacy-endpoints": "true"},
+                "shielded_instance_config": {
+                    "enable_secure_boot": True,
+                    "enable_integrity_monitoring": True,
+                },
+                "workload_metadata_config": {"mode": "GKE_METADATA"},
+                "guest_accelerators": [
+                    {
+                        "type": cfg.gcp_gpu_accelerator_type,
+                        "count": cfg.gcp_gpu_accelerator_count,
+                        "gpu_driver_installation_config": {"gpu_driver_version": "DEFAULT"},
+                    }
+                ],
+                "taints": [
+                    {"key": "nvidia.com/gpu", "value": "present", "effect": "NO_SCHEDULE"},
+                ],
+            },
+        }
+        if cfg.kubernetes_version:
+            gpu_node_pool_args["version"] = cfg.kubernetes_version
+
+        gpu_node_pool = gcp.container.NodePool("gke-gpu-node-pool", **gpu_node_pool_args)
+        gke_depends_on.append(gpu_node_pool)
+
     client_config = gcp.organizations.get_client_config()
     cert = cluster.master_auth.apply(_gke_cluster_ca_certificate)
     kubeconfig = pulumi.Output.all(cluster.name, cluster.endpoint, cert, client_config.access_token).apply(
@@ -196,7 +241,7 @@ def create_gke_cluster(cfg: ClusterConfig) -> KubernetesCluster:
     provider = k8s.Provider(
         "gke-provider",
         kubeconfig=kubeconfig,
-        opts=pulumi.ResourceOptions(depends_on=[node_pool]),
+        opts=pulumi.ResourceOptions(depends_on=gke_depends_on),
     )
 
-    return KubernetesCluster(name=cluster.name, provider=provider, depends_on=[cluster, node_pool])
+    return KubernetesCluster(name=cluster.name, provider=provider, depends_on=gke_depends_on)
