@@ -274,6 +274,34 @@ def create_eks_cluster(cfg: ClusterConfig) -> KubernetesCluster:
         opts=pulumi.ResourceOptions(depends_on=node_policy_attachments + private_route_tables),
     )
 
+    eks_depends_on: list[pulumi.Resource] = [cluster, node_group]
+
+    if cfg.aws_gpu_node_group_enabled:
+        gpu_node_group = aws.eks.NodeGroup(
+            "eks-gpu-node-group",
+            cluster_name=cluster.name,
+            node_group_name="gpu",
+            node_role_arn=node_role.arn,
+            subnet_ids=[subnet.id for subnet in private_subnets],
+            version=cfg.kubernetes_version,
+            ami_type="AL2023_x86_64_NVIDIA",
+            capacity_type="ON_DEMAND",
+            disk_size=100,
+            instance_types=[cfg.aws_gpu_instance_type],
+            scaling_config={
+                "desired_size": cfg.aws_gpu_node_min_count,
+                "min_size": cfg.aws_gpu_node_min_count,
+                "max_size": cfg.aws_gpu_node_max_count,
+            },
+            update_config={"max_unavailable": 1},
+            taints=[
+                {"key": "nvidia.com/gpu", "value": "present", "effect": "NO_SCHEDULE"},
+            ],
+            tags={"Name": f"{cfg.cluster_name}-gpu"},
+            opts=pulumi.ResourceOptions(depends_on=node_policy_attachments + private_route_tables),
+        )
+        eks_depends_on.append(gpu_node_group)
+
     kubeconfig = pulumi.Output.all(cluster.name, cluster.endpoint, cluster.certificate_authority.data).apply(
         lambda args: _eks_kubeconfig(args[0], args[1], args[2], region)
     )
@@ -281,7 +309,15 @@ def create_eks_cluster(cfg: ClusterConfig) -> KubernetesCluster:
     provider = k8s.Provider(
         "eks-provider",
         kubeconfig=kubeconfig,
-        opts=pulumi.ResourceOptions(depends_on=[node_group]),
+        opts=pulumi.ResourceOptions(depends_on=eks_depends_on),
     )
 
-    return KubernetesCluster(name=cluster.name, provider=provider, depends_on=[cluster, node_group])
+    if cfg.aws_gpu_node_group_enabled:
+        device_plugin = k8s.yaml.v2.ConfigFile(
+            "nvidia-device-plugin",
+            file=cfg.nvidia_device_plugin_manifest_url,
+            opts=pulumi.ResourceOptions(provider=provider, depends_on=eks_depends_on),
+        )
+        eks_depends_on.append(device_plugin)
+
+    return KubernetesCluster(name=cluster.name, provider=provider, depends_on=eks_depends_on)

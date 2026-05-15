@@ -61,3 +61,23 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
 ```
 
 The root Argo CD Applications allow empty paths, so the placeholder repos can be pushed incrementally without blocking the cluster bootstrap.
+
+## GPU support
+
+All three stacks provision GPU capacity by default so the KFP PPO trainer can request `nvidia.com/gpu: 1`.
+
+| target | resource added                                                    | toggle off                                            |
+|--------|-------------------------------------------------------------------|-------------------------------------------------------|
+| local  | minikube with `--driver=docker --container-runtime=docker --gpus=all`, NVIDIA device plugin DaemonSet | `pulumi config set test-cluster:minikubeGpu false`    |
+| gcp    | second GKE NodePool `gpu` (`g2-standard-4` + `nvidia-l4`, autoscale 0→1, taint `nvidia.com/gpu=present:NoSchedule`, GKE-managed driver install) | `pulumi config set test-cluster:gcpGpuNodePoolEnabled false` |
+| aws    | second EKS NodeGroup `gpu` (`g4dn.xlarge`, AMI `AL2023_x86_64_NVIDIA`, taint `nvidia.com/gpu=present:NoSchedule`) + NVIDIA device plugin DaemonSet | `pulumi config set test-cluster:awsGpuNodeGroupEnabled false` |
+
+Local prerequisites on WSL2:
+
+- Docker Desktop with WSL2 backend.
+- NVIDIA Container Toolkit installed on the host.
+- Sanity check: `docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi` shows the GPU.
+
+KFP v2 sets the matching toleration automatically when a step calls
+`set_accelerator_type("nvidia.com/gpu")`, so GPU steps schedule onto the
+tainted GPU pool without extra wiring.

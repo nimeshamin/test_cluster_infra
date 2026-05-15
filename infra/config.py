@@ -29,15 +29,27 @@ class ClusterConfig:
     local_minikube_nodes: int
     local_minikube_cpus: int
     local_minikube_memory_mb: int
+    local_minikube_gpu: bool
     gcp_location: str
     gcp_node_machine_type: str
     gcp_node_min_count: int
     gcp_node_max_count: int
     gcp_master_authorized_cidr_blocks: list[dict[str, str]]
+    gcp_gpu_node_pool_enabled: bool
+    gcp_gpu_machine_type: str
+    gcp_gpu_accelerator_type: str
+    gcp_gpu_accelerator_count: int
+    gcp_gpu_node_min_count: int
+    gcp_gpu_node_max_count: int
     aws_node_instance_type: str
     aws_node_min_count: int
     aws_node_max_count: int
     aws_endpoint_public_access_cidrs: list[str]
+    aws_gpu_node_group_enabled: bool
+    aws_gpu_instance_type: str
+    aws_gpu_node_min_count: int
+    aws_gpu_node_max_count: int
+    nvidia_device_plugin_manifest_url: str
 
 
 def _stack_target(config: pulumi.Config) -> str:
@@ -112,6 +124,7 @@ def load_config() -> ClusterConfig:
         local_minikube_nodes=config.get_int("minikubeNodes") or 2,
         local_minikube_cpus=config.get_int("minikubeCpus") or 4,
         local_minikube_memory_mb=config.get_int("minikubeMemory") or 7168,
+        local_minikube_gpu=config.get_bool("minikubeGpu") if config.get("minikubeGpu") is not None else True,
         gcp_location=config.get("gcpLocation") or "us-central1",
         gcp_node_machine_type=config.get("gcpNodeMachineType") or "e2-standard-4",
         gcp_node_min_count=config.get_int("gcpNodeMinCount") or 2,
@@ -121,6 +134,14 @@ def load_config() -> ClusterConfig:
             "gcpMasterAuthorizedCidrBlocks",
             [{"name": "local-admin", "cidrBlock": "0.0.0.0/0"}],
         ),
+        gcp_gpu_node_pool_enabled=(
+            config.get_bool("gcpGpuNodePoolEnabled") if config.get("gcpGpuNodePoolEnabled") is not None else True
+        ),
+        gcp_gpu_machine_type=config.get("gcpGpuMachineType") or "g2-standard-4",
+        gcp_gpu_accelerator_type=config.get("gcpGpuAcceleratorType") or "nvidia-l4",
+        gcp_gpu_accelerator_count=config.get_int("gcpGpuAcceleratorCount") or 1,
+        gcp_gpu_node_min_count=config.get_int("gcpGpuNodeMinCount") or 0,
+        gcp_gpu_node_max_count=config.get_int("gcpGpuNodeMaxCount") or 1,
         aws_node_instance_type=config.get("awsNodeInstanceType") or "t3.xlarge",
         aws_node_min_count=config.get_int("awsNodeMinCount") or 2,
         aws_node_max_count=config.get_int("awsNodeMaxCount") or 4,
@@ -128,5 +149,15 @@ def load_config() -> ClusterConfig:
             config,
             "awsEndpointPublicAccessCidrs",
             ["0.0.0.0/0"],
+        ),
+        aws_gpu_node_group_enabled=(
+            config.get_bool("awsGpuNodeGroupEnabled") if config.get("awsGpuNodeGroupEnabled") is not None else True
+        ),
+        aws_gpu_instance_type=config.get("awsGpuInstanceType") or "g4dn.xlarge",
+        aws_gpu_node_min_count=config.get_int("awsGpuNodeMinCount") or 0,
+        aws_gpu_node_max_count=config.get_int("awsGpuNodeMaxCount") or 1,
+        nvidia_device_plugin_manifest_url=(
+            config.get("nvidiaDevicePluginManifestUrl")
+            or "https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.19.1/deployments/static/nvidia-device-plugin.yml"
         ),
     )

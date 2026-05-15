@@ -7,6 +7,12 @@ config:
   test-cluster:gcpNodeMachineType: e2-standard-4
   test-cluster:gcpNodeMinCount: "2"
   test-cluster:gcpNodeMaxCount: "4"
+  test-cluster:gcpGpuNodePoolEnabled: "true"
+  test-cluster:gcpGpuMachineType: g2-standard-4
+  test-cluster:gcpGpuAcceleratorType: nvidia-l4
+  test-cluster:gcpGpuAcceleratorCount: "1"
+  test-cluster:gcpGpuNodeMinCount: "0"
+  test-cluster:gcpGpuNodeMaxCount: "1"
   test-cluster:gcpMasterAuthorizedCidrBlocks:
     - name: local-admin
       cidrBlock: 0.0.0.0/0
