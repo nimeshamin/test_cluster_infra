@@ -14,6 +14,8 @@ ALLOWED_HELM_REPOS = [
     "https://istio-release.storage.googleapis.com/charts",
     "https://grafana.github.io/helm-charts",
     "https://prometheus-community.github.io/helm-charts",
+    "https://community-charts.github.io/helm-charts",
+    "https://github.com/kubeflow/pipelines.git",
 ]
 
 
