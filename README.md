@@ -1,31 +1,32 @@
 # test-cluster
 
-Pulumi Python infrastructure for creating a Kubernetes cluster on kind, GKE, or EKS and bootstrapping Argo CD into it. Argo CD is configured to read from two GitOps repositories:
+Pulumi Python infrastructure for creating a Kubernetes cluster on kind, GKE, or EKS and bootstrapping Argo CD into it. The cluster is left empty after bootstrap — Argo CD is then pointed at two GitOps repositories that own everything that runs on top:
 
-- `platform-base`: `test_cluster_k8s_base`
-- `application-services`: `test_cluster_k8s_app`
+- `platform-base`: [`test_cluster_k8s_base`](https://github.com/nimeshamin/test_cluster_k8s_base) — Istio, the observability stack, Kubeflow Pipelines, MLflow, namespaces.
+- `application-services`: [`test_cluster_k8s_app`](https://github.com/nimeshamin/test_cluster_k8s_app) — the PPO runtime (Argo WorkflowTemplate + trigger RBAC).
+
+## What this repo provisions
+
+- The Kubernetes cluster itself (kind / GKE / EKS).
+- A GPU pool on every target (toggle off per-stack — see [GPU support](#gpu-support)).
+- The NVIDIA k8s device plugin DaemonSet on local and AWS (GKE handles this via its own driver-install DaemonSet).
+- A Helm install of Argo CD into the cluster.
+- The two root `Application` resources Argo CD uses to bootstrap the GitOps repos above.
+
+Anything else running in the cluster — observability stack, Istio, KFP, MLflow, the PPO runtime — is owned by the GitOps repos. Chart versions for those apps live in their respective READMEs.
 
 ## Version defaults
 
-The defaults are intentionally provider-aware:
-
 - local/kind: Kubernetes `v1.34.0` (uses `kindest/node:v1.34.0`)
 - AWS EKS: Kubernetes `1.35`
-- GKE: Stable release channel by default; set `test-cluster:kubernetesVersion` to pin a specific GKE patch
+- GKE: Stable release channel by default; set `test-cluster:kubernetesVersion` to pin a specific patch
 - Argo CD chart: `9.5.14`
-- Grafana chart: `10.5.15`
-- Prometheus chart: `29.6.0`
-- Alloy chart: `1.8.1`
-- Tempo chart: `1.24.4`
-- Loki chart: `7.0.0`
-- Pyroscope chart: `2.0.1`
-
-EKS is pinned to `1.35`, and GKE should be managed through the Stable channel unless you need a deterministic patch pin.
+- NVIDIA k8s-device-plugin chart (local + AWS targets only): `0.19.1`
 
 ## First run
 
 ```bash
-cd /Users/nimesh/Source/test_cluster
+cd test_cluster_infra
 uv sync
 
 pulumi stack init nimeshamin/local
@@ -62,20 +63,16 @@ The root Argo CD Applications allow empty paths, so the placeholder repos can be
 
 ## GPU support
 
-All three stacks provision GPU capacity by default so the KFP PPO trainer can request `nvidia.com/gpu: 1`.
+All three stacks provision GPU capacity by default. Workloads requesting `nvidia.com/gpu: 1` schedule onto the GPU pool; the corresponding `nvidia.com/gpu=present:NoSchedule` toleration is set automatically by KFP v2 when a step calls `set_accelerator_type("nvidia.com/gpu")`.
 
 | target | resource added                                                    | toggle off                                            |
 |--------|-------------------------------------------------------------------|-------------------------------------------------------|
-| local  | kind cluster with 2 nodes (control-plane handles CPU work, a dedicated worker labeled `nvidia.com/gpu=present` and tainted `nvidia.com/gpu=present:NoSchedule` runs GPU pods). Containerd inside the GPU node is reconfigured to use `nvidia-container-runtime`, plus the NVIDIA k8s device plugin DaemonSet. | `pulumi config set test-cluster:kindGpu false` |
+| local  | kind cluster with 2 nodes (control-plane handles CPU work; a dedicated worker labeled `nvidia.com/gpu=present` and tainted `nvidia.com/gpu=present:NoSchedule` runs GPU pods). Containerd inside the GPU node is reconfigured to use `nvidia-container-runtime`, plus the NVIDIA k8s device plugin DaemonSet. | `pulumi config set test-cluster:kindGpu false` |
 | gcp    | second GKE NodePool `gpu` (`g2-standard-4` + `nvidia-l4`, autoscale 0→1, taint `nvidia.com/gpu=present:NoSchedule`, GKE-managed driver install) | `pulumi config set test-cluster:gcpGpuNodePoolEnabled false` |
 | aws    | second EKS NodeGroup `gpu` (`g4dn.xlarge`, AMI `AL2023_x86_64_NVIDIA`, taint `nvidia.com/gpu=present:NoSchedule`) + NVIDIA device plugin DaemonSet | `pulumi config set test-cluster:awsGpuNodeGroupEnabled false` |
 
-Local prerequisites on WSL2:
+### Local prerequisites on WSL2
 
 - Docker Desktop with WSL2 backend, **Kubernetes feature disabled** (we run kind, not DD's K8s).
 - Docker's `default-runtime` set to `nvidia` (`docker info | grep -i 'Default Runtime'` should report `nvidia`). Configure via Docker Desktop → Settings → Docker Engine → daemon.json.
 - Sanity check: `docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi` shows the GPU.
-
-KFP v2 sets the matching toleration automatically when a step calls
-`set_accelerator_type("nvidia.com/gpu")`, so GPU steps schedule onto the
-tainted GPU pool without extra wiring.
