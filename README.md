@@ -1,6 +1,6 @@
 # test-cluster
 
-Pulumi Python infrastructure for creating a Kubernetes cluster on minikube, GKE, or EKS and bootstrapping Argo CD into it. Argo CD is configured to read from two GitOps repositories:
+Pulumi Python infrastructure for creating a Kubernetes cluster on kind, GKE, or EKS and bootstrapping Argo CD into it. Argo CD is configured to read from two GitOps repositories:
 
 - `platform-base`: `test_cluster_k8s_base`
 - `application-services`: `test_cluster_k8s_app`
@@ -9,7 +9,7 @@ Pulumi Python infrastructure for creating a Kubernetes cluster on minikube, GKE,
 
 The defaults are intentionally provider-aware:
 
-- local/minikube: Kubernetes `v1.34.0`
+- local/kind: Kubernetes `v1.34.0` (uses `kindest/node:v1.34.0`)
 - AWS EKS: Kubernetes `1.35`
 - GKE: Stable release channel by default; set `test-cluster:kubernetesVersion` to pin a specific GKE patch
 - Argo CD chart: `9.5.14`
@@ -20,7 +20,7 @@ The defaults are intentionally provider-aware:
 - Loki chart: `7.0.0`
 - Pyroscope chart: `2.0.1`
 
-As of this local setup, minikube `v1.37.0` reports `v1.34.0` as its newest supported Kubernetes version. EKS is pinned to `1.35`, and GKE should be managed through the Stable channel unless you need a deterministic patch pin.
+EKS is pinned to `1.35`, and GKE should be managed through the Stable channel unless you need a deterministic patch pin.
 
 ## First run
 
@@ -49,8 +49,6 @@ pulumi up --stack nimeshamin/aws
 
 The sample stack files use `0.0.0.0/0` for initial usability. Replace it with your current admin IP before creating cloud clusters.
 
-The local stack requests `7168MB` from Docker Desktop by default. Increase `test-cluster:minikubeMemory` only after raising Docker Desktop's memory limit.
-
 ## Argo CD access
 
 No ingress controller is installed. Use port-forwarding:
@@ -68,14 +66,14 @@ All three stacks provision GPU capacity by default so the KFP PPO trainer can re
 
 | target | resource added                                                    | toggle off                                            |
 |--------|-------------------------------------------------------------------|-------------------------------------------------------|
-| local  | minikube with `--driver=docker --container-runtime=docker --gpus=all`, NVIDIA device plugin DaemonSet | `pulumi config set test-cluster:minikubeGpu false`    |
+| local  | kind cluster with 2 nodes (control-plane handles CPU work, a dedicated worker labeled `nvidia.com/gpu=present` and tainted `nvidia.com/gpu=present:NoSchedule` runs GPU pods). Containerd inside the GPU node is reconfigured to use `nvidia-container-runtime`, plus the NVIDIA k8s device plugin DaemonSet. | `pulumi config set test-cluster:kindGpu false` |
 | gcp    | second GKE NodePool `gpu` (`g2-standard-4` + `nvidia-l4`, autoscale 0→1, taint `nvidia.com/gpu=present:NoSchedule`, GKE-managed driver install) | `pulumi config set test-cluster:gcpGpuNodePoolEnabled false` |
 | aws    | second EKS NodeGroup `gpu` (`g4dn.xlarge`, AMI `AL2023_x86_64_NVIDIA`, taint `nvidia.com/gpu=present:NoSchedule`) + NVIDIA device plugin DaemonSet | `pulumi config set test-cluster:awsGpuNodeGroupEnabled false` |
 
 Local prerequisites on WSL2:
 
-- Docker Desktop with WSL2 backend.
-- NVIDIA Container Toolkit installed on the host.
+- Docker Desktop with WSL2 backend, **Kubernetes feature disabled** (we run kind, not DD's K8s).
+- Docker's `default-runtime` set to `nvidia` (`docker info | grep -i 'Default Runtime'` should report `nvidia`). Configure via Docker Desktop → Settings → Docker Engine → daemon.json.
 - Sanity check: `docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi` shows the GPU.
 
 KFP v2 sets the matching toleration automatically when a step calls

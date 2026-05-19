@@ -4,13 +4,13 @@ from infra.argocd import install_argocd
 from infra.aws import create_eks_cluster
 from infra.config import load_config
 from infra.gcp import create_gke_cluster
-from infra.local import create_minikube_cluster
+from infra.local import create_kind_cluster
 
 
 cfg = load_config()
 
 if cfg.target == "local":
-    cluster = create_minikube_cluster(cfg)
+    cluster = create_kind_cluster(cfg)
 elif cfg.target == "gcp":
     cluster = create_gke_cluster(cfg)
 elif cfg.target == "aws":

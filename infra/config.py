@@ -25,11 +25,9 @@ class ClusterConfig:
     argocd_namespace: str
     argocd_chart_version: str
     gitops_repos: tuple[GitOpsRepo, ...]
-    local_minikube_driver: str
-    local_minikube_nodes: int
-    local_minikube_cpus: int
-    local_minikube_memory_mb: int
-    local_minikube_gpu: bool
+    local_kind_node_image: str
+    local_kind_gpu: bool
+    local_kind_device_plugin_chart_version: str
     gcp_location: str
     gcp_node_machine_type: str
     gcp_node_min_count: int
@@ -120,11 +118,14 @@ def load_config() -> ClusterConfig:
         argocd_namespace=config.get("argocdNamespace") or "argocd",
         argocd_chart_version=config.get("argocdChartVersion") or "9.5.14",
         gitops_repos=repos,
-        local_minikube_driver=config.get("minikubeDriver") or "docker",
-        local_minikube_nodes=config.get_int("minikubeNodes") or 2,
-        local_minikube_cpus=config.get_int("minikubeCpus") or 4,
-        local_minikube_memory_mb=config.get_int("minikubeMemory") or 7168,
-        local_minikube_gpu=config.get_bool("minikubeGpu") if config.get("minikubeGpu") is not None else True,
+        local_kind_node_image=(
+            config.get("kindNodeImage")
+            or f"kindest/node:{config.get('kubernetesVersion') or _default_kubernetes_version(target) or 'v1.34.0'}"
+        ),
+        local_kind_gpu=config.get_bool("kindGpu") if config.get("kindGpu") is not None else True,
+        local_kind_device_plugin_chart_version=(
+            config.get("kindDevicePluginChartVersion") or "0.19.1"
+        ),
         gcp_location=config.get("gcpLocation") or "us-central1",
         gcp_node_machine_type=config.get("gcpNodeMachineType") or "e2-standard-4",
         gcp_node_min_count=config.get_int("gcpNodeMinCount") or 2,
