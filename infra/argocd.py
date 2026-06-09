@@ -16,6 +16,7 @@ ALLOWED_HELM_REPOS = [
     "https://prometheus-community.github.io/helm-charts",
     "https://community-charts.github.io/helm-charts",
     "https://github.com/kubeflow/pipelines.git",
+    "https://ray-project.github.io/kuberay-helm",
 ]
 
 

@@ -25,6 +25,12 @@ name: {cluster_name}
 nodes:
   - role: control-plane
     image: {node_image}
+    labels:
+      # The rl-bridge DaemonSet uses nodeSelector rl-worker=true to schedule
+      # only on nodes that host UE workers. On kind the control-plane is the
+      # only untainted node (the GPU worker rejects non-GPU pods), so UE
+      # workers land here and the bridge has to colocate with them.
+      rl-worker: "true"
     kubeadmConfigPatches:
       - |
         kind: InitConfiguration
