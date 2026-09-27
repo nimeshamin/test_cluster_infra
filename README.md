@@ -67,6 +67,7 @@ On this branch the `gcp` stack turns the GPU pool off, points both GitOps repos 
 
 - `n2-standard-4` (nested virtualization needs an Intel machine family; E2 is not supported), `UBUNTU_CONTAINERD` image, `advanced_machine_features.enable_nested_virtualization = true` so the node exposes `/dev/kvm`.
 - Pinned to a single zone (`gcpFirecrackerZone`, default `<gcpLocation>-a`) so the regional pool is one node, not one per zone.
+- The `primary` pool is also pinned to `us-central1-a` via `gcpNodeLocations` (2–4 nodes instead of 2–4 per zone); unset, GKE spreads it across every zone in the region.
 - Labelled `firecracker=true` and tainted `firecracker=true:NoSchedule`; only the `firecracker-host` DaemonSet from `test_cluster_k8s_base` tolerates it.
 
 | Key | Default | |

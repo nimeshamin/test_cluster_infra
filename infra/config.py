@@ -32,6 +32,7 @@ class ClusterConfig:
     gcp_node_machine_type: str
     gcp_node_min_count: int
     gcp_node_max_count: int
+    gcp_node_locations: list[str]
     gcp_master_authorized_cidr_blocks: list[dict[str, str]]
     gcp_gpu_node_pool_enabled: bool
     gcp_gpu_machine_type: str
@@ -135,6 +136,8 @@ def load_config() -> ClusterConfig:
         gcp_node_machine_type=config.get("gcpNodeMachineType") or "e2-standard-4",
         gcp_node_min_count=config.get_int("gcpNodeMinCount") or 2,
         gcp_node_max_count=config.get_int("gcpNodeMaxCount") or 4,
+        # Empty means GKE's default: one set of nodes in every zone of a regional cluster.
+        gcp_node_locations=_get_object_list(config, "gcpNodeLocations", []),
         gcp_master_authorized_cidr_blocks=_get_object_list(
             config,
             "gcpMasterAuthorizedCidrBlocks",

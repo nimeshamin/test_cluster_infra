@@ -182,6 +182,8 @@ def create_gke_cluster(cfg: ClusterConfig) -> KubernetesCluster:
             "workload_metadata_config": {"mode": "GKE_METADATA"},
         },
     }
+    if cfg.gcp_node_locations:
+        node_pool_args["node_locations"] = cfg.gcp_node_locations
     if cfg.kubernetes_version:
         node_pool_args["version"] = cfg.kubernetes_version
 
