@@ -77,6 +77,21 @@ On this branch the `gcp` stack turns the GPU pool off, points both GitOps repos 
 | `gcpFirecrackerZone` | `<gcpLocation>-a` | |
 | `gcpFirecrackerNodeMinCount` / `gcpFirecrackerNodeMaxCount` | `1` / `1` | |
 
+### Bring-up script
+
+`scripts/cluster-up.sh` runs the whole GCP bring-up and is safe to rerun on a live cluster:
+
+1. Preflight: tools, `gcloud auth application-default login`, `pulumi login`, branch check.
+2. `pulumi preview`; asks for confirmation if any infrastructure would change (the Kubernetes provider's token refresh is ignored), then `pulumi up`.
+3. Regenerates `~/.kube/test-cluster-gcp.yaml` via `~/.kube/refresh-test-cluster-gcp.sh` (local, not in this repo).
+4. Ensures the `fc-system/ghcr-pull` image pull secret. An existing secret is kept if it can still pull from GHCR; otherwise it prompts (hidden input) for a **classic** GitHub token with `read:packages`, checks it against GHCR, and writes the secret. Fine-grained `github_pat_` tokens are rejected because GHCR does not accept them. `GHCR_TOKEN` skips the prompt; `--rotate-secret` forces a new token.
+5. Polls until all nodes, every Argo CD Application, `firecracker-host`, `fc-api` and `fc-agent` are ready (`--timeout`, default 1200s).
+
+```bash
+scripts/cluster-up.sh            # confirm before infrastructure changes
+scripts/cluster-up.sh --yes      # unattended
+```
+
 ## GPU support
 
 All three stacks provision GPU capacity by default. Workloads requesting `nvidia.com/gpu: 1` schedule onto the GPU pool; the corresponding `nvidia.com/gpu=present:NoSchedule` toleration is set automatically by KFP v2 when a step calls `set_accelerator_type("nvidia.com/gpu")`.
