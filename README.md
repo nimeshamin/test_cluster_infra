@@ -92,6 +92,15 @@ scripts/cluster-up.sh            # confirm before infrastructure changes
 scripts/cluster-up.sh --yes      # unattended
 ```
 
+### Tear-down script
+
+`scripts/cluster-down.sh` destroys the stack without leaving billed disks behind. While the cluster is still reachable it records every PV's GCE disk, deletes the root Argo CD Applications and waits for Argo CD to cascade-delete everything (a bare `pulumi destroy` can hang on their finalizers), then deletes leftover PVCs (StatefulSet claims are not owned by Argo CD) and waits for the disks to be released. After `pulumi destroy` it checks through the Compute API that each recorded disk is gone and prints `gcloud compute disks delete` commands for any that are not. Only disks this cluster created are checked.
+
+```bash
+scripts/cluster-down.sh          # type the cluster name to confirm
+scripts/cluster-down.sh --yes    # unattended
+```
+
 ## GPU support
 
 All three stacks provision GPU capacity by default. Workloads requesting `nvidia.com/gpu: 1` schedule onto the GPU pool; the corresponding `nvidia.com/gpu=present:NoSchedule` toleration is set automatically by KFP v2 when a step calls `set_accelerator_type("nvidia.com/gpu")`.
