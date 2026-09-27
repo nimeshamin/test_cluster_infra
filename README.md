@@ -61,6 +61,21 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.pas
 
 The root Argo CD Applications allow empty paths, so the placeholder repos can be pushed incrementally without blocking the cluster bootstrap.
 
+## Firecracker node pool (GCP, `firecracker` branch)
+
+On this branch the `gcp` stack turns the GPU pool off, points both GitOps repos at their `firecracker` branches (`baseRepoRevision` / `appRepoRevision`), and adds a third GKE NodePool `firecracker` for running Firecracker microVMs:
+
+- `n2-standard-4` (nested virtualization needs an Intel machine family; E2 is not supported), `UBUNTU_CONTAINERD` image, `advanced_machine_features.enable_nested_virtualization = true` so the node exposes `/dev/kvm`.
+- Pinned to a single zone (`gcpFirecrackerZone`, default `<gcpLocation>-a`) so the regional pool is one node, not one per zone.
+- Labelled `firecracker=true` and tainted `firecracker=true:NoSchedule`; only the `firecracker-host` DaemonSet from `test_cluster_k8s_base` tolerates it.
+
+| Key | Default | |
+|---|---|---|
+| `gcpFirecrackerNodePoolEnabled` | `false` (set `true` in `Pulumi.gcp.yaml` on this branch) | |
+| `gcpFirecrackerMachineType` | `n2-standard-4` | |
+| `gcpFirecrackerZone` | `<gcpLocation>-a` | |
+| `gcpFirecrackerNodeMinCount` / `gcpFirecrackerNodeMaxCount` | `1` / `1` | |
+
 ## GPU support
 
 All three stacks provision GPU capacity by default. Workloads requesting `nvidia.com/gpu: 1` schedule onto the GPU pool; the corresponding `nvidia.com/gpu=present:NoSchedule` toleration is set automatically by KFP v2 when a step calls `set_accelerator_type("nvidia.com/gpu")`.

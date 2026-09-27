@@ -39,6 +39,11 @@ class ClusterConfig:
     gcp_gpu_accelerator_count: int
     gcp_gpu_node_min_count: int
     gcp_gpu_node_max_count: int
+    gcp_firecracker_node_pool_enabled: bool
+    gcp_firecracker_machine_type: str
+    gcp_firecracker_zone: str
+    gcp_firecracker_node_min_count: int
+    gcp_firecracker_node_max_count: int
     aws_node_instance_type: str
     aws_node_min_count: int
     aws_node_max_count: int
@@ -101,13 +106,13 @@ def load_config() -> ClusterConfig:
             name="platform-base",
             url=base_repo_url,
             path=_repo_path(config.get("baseRepoPath") or "environments/{target}", target),
-            revision=config.get("baseRepoRevision") or "main",
+            revision=config.get("baseRepoRevision") or "firecracker",
         ),
         GitOpsRepo(
             name="application-services",
             url=app_repo_url,
             path=_repo_path(config.get("appRepoPath") or "environments/{target}", target),
-            revision=config.get("appRepoRevision") or "main",
+            revision=config.get("appRepoRevision") or "firecracker",
         ),
     )
 
@@ -143,6 +148,22 @@ def load_config() -> ClusterConfig:
         gcp_gpu_accelerator_count=config.get_int("gcpGpuAcceleratorCount") or 1,
         gcp_gpu_node_min_count=config.get_int("gcpGpuNodeMinCount") or 0,
         gcp_gpu_node_max_count=config.get_int("gcpGpuNodeMaxCount") or 1,
+        gcp_firecracker_node_pool_enabled=(
+            config.get_bool("gcpFirecrackerNodePoolEnabled")
+            if config.get("gcpFirecrackerNodePoolEnabled") is not None
+            else False
+        ),
+        # Nested virtualization needs an Intel machine family (N2/N2D-Intel/C3...); E2 is not supported.
+        gcp_firecracker_machine_type=config.get("gcpFirecrackerMachineType") or "n2-standard-4",
+        # Regional pools create node_count nodes per zone; pin to one zone so the
+        # pool is a single host unless explicitly overridden.
+        gcp_firecracker_zone=config.get("gcpFirecrackerZone") or f"{config.get('gcpLocation') or 'us-central1'}-a",
+        gcp_firecracker_node_min_count=(
+            config.get_int("gcpFirecrackerNodeMinCount")
+            if config.get("gcpFirecrackerNodeMinCount") is not None
+            else 1
+        ),
+        gcp_firecracker_node_max_count=config.get_int("gcpFirecrackerNodeMaxCount") or 1,
         aws_node_instance_type=config.get("awsNodeInstanceType") or "t3.xlarge",
         aws_node_min_count=config.get_int("awsNodeMinCount") or 2,
         aws_node_max_count=config.get_int("awsNodeMaxCount") or 4,

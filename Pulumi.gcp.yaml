@@ -3,16 +3,23 @@ config:
   test-cluster:clusterName: test-cluster-gcp
   test-cluster:baseRepoUrl: https://github.com/nimeshamin/test_cluster_k8s_base.git
   test-cluster:appRepoUrl: https://github.com/nimeshamin/test_cluster_k8s_app.git
+  test-cluster:baseRepoRevision: firecracker
+  test-cluster:appRepoRevision: firecracker
   test-cluster:gcpLocation: us-central1
   test-cluster:gcpNodeMachineType: e2-standard-4
   test-cluster:gcpNodeMinCount: "2"
   test-cluster:gcpNodeMaxCount: "4"
-  test-cluster:gcpGpuNodePoolEnabled: "true"
+  test-cluster:gcpGpuNodePoolEnabled: "false"
   test-cluster:gcpGpuMachineType: g2-standard-4
   test-cluster:gcpGpuAcceleratorType: nvidia-l4
   test-cluster:gcpGpuAcceleratorCount: "1"
   test-cluster:gcpGpuNodeMinCount: "0"
   test-cluster:gcpGpuNodeMaxCount: "1"
+  test-cluster:gcpFirecrackerNodePoolEnabled: "true"
+  test-cluster:gcpFirecrackerMachineType: n2-standard-4
+  test-cluster:gcpFirecrackerZone: us-central1-a
+  test-cluster:gcpFirecrackerNodeMinCount: "1"
+  test-cluster:gcpFirecrackerNodeMaxCount: "1"
   test-cluster:gcpMasterAuthorizedCidrBlocks:
     - name: local-admin
       cidrBlock: 0.0.0.0/0
