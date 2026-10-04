@@ -20,6 +20,7 @@ config:
   test-cluster:gcpFirecrackerNodePoolEnabled: "true"
   test-cluster:gcpFirecrackerMachineType: n2-standard-4
   test-cluster:gcpFirecrackerZone: us-central1-a
+  test-cluster:gcpFirecrackerLocalSsdCount: "1"
   test-cluster:gcpFirecrackerNodeMinCount: "1"
   test-cluster:gcpFirecrackerNodeMaxCount: "1"
   test-cluster:gcpMasterAuthorizedCidrBlocks:

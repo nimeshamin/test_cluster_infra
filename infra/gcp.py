@@ -273,6 +273,12 @@ def create_gke_cluster(cfg: ClusterConfig) -> KubernetesCluster:
                 ],
             },
         }
+        if cfg.gcp_firecracker_local_ssd_count:
+            # Raw block devices (not formatted by GKE): firecracker-host turns the
+            # first one into the XFS reflink image store.
+            firecracker_node_pool_args["node_config"]["local_nvme_ssd_block_config"] = {
+                "local_ssd_count": cfg.gcp_firecracker_local_ssd_count,
+            }
         if cfg.kubernetes_version:
             firecracker_node_pool_args["version"] = cfg.kubernetes_version
 

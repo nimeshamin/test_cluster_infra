@@ -43,6 +43,7 @@ class ClusterConfig:
     gcp_firecracker_node_pool_enabled: bool
     gcp_firecracker_machine_type: str
     gcp_firecracker_zone: str
+    gcp_firecracker_local_ssd_count: int
     gcp_firecracker_node_min_count: int
     gcp_firecracker_node_max_count: int
     aws_node_instance_type: str
@@ -161,6 +162,9 @@ def load_config() -> ClusterConfig:
         # Regional pools create node_count nodes per zone; pin to one zone so the
         # pool is a single host unless explicitly overridden.
         gcp_firecracker_zone=config.get("gcpFirecrackerZone") or f"{config.get('gcpLocation') or 'us-central1'}-a",
+        # Raw local NVMe SSDs (375 GB each) for the reflink image store; the
+        # firecracker-host DaemonSet formats the first one XFS. 0 = loop file.
+        gcp_firecracker_local_ssd_count=config.get_int("gcpFirecrackerLocalSsdCount") or 0,
         gcp_firecracker_node_min_count=(
             config.get_int("gcpFirecrackerNodeMinCount")
             if config.get("gcpFirecrackerNodeMinCount") is not None
