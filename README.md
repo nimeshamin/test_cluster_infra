@@ -78,6 +78,7 @@ On this branch the `gcp` stack turns the GPU pool off, points both GitOps repos 
 | `gcpFirecrackerMachineType` | `n2-standard-4` | |
 | `gcpFirecrackerZone` | `<gcpLocation>-a` | |
 | `gcpFirecrackerNodeMinCount` / `gcpFirecrackerNodeMaxCount` | `1` / `1` | |
+| `gcpFirecrackerDedicatedPools` | `[]` | per-tenant pools, e.g. `[{"tenant": "acme", "machineType": "n2-standard-4", "nodeCount": 1}]`: same Firecracker node shape, labelled `node-restriction.kubernetes.io/fc-tenant=<tenant>` (kubelets cannot set that prefix, so a compromised node cannot relabel itself); the control plane places only that tenant's VMs there |
 | `gcpFirecrackerLocalSsdCount` | `0` (set `1` in `Pulumi.gcp.yaml` on this branch) | raw local NVMe SSDs for the image store |
 
 ### Bring-up script

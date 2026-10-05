@@ -44,6 +44,7 @@ class ClusterConfig:
     gcp_firecracker_machine_type: str
     gcp_firecracker_zone: str
     gcp_firecracker_local_ssd_count: int
+    gcp_firecracker_dedicated_pools: list[dict[str, Any]]
     gcp_firecracker_node_min_count: int
     gcp_firecracker_node_max_count: int
     aws_node_instance_type: str
@@ -165,6 +166,8 @@ def load_config() -> ClusterConfig:
         # Raw local NVMe SSDs (375 GB each) for the reflink image store; the
         # firecracker-host DaemonSet formats the first one XFS. 0 = loop file.
         gcp_firecracker_local_ssd_count=config.get_int("gcpFirecrackerLocalSsdCount") or 0,
+        # [{"tenant": "acme", "machineType": "n2-standard-4", "nodeCount": 1}, ...]
+        gcp_firecracker_dedicated_pools=_get_object_list(config, "gcpFirecrackerDedicatedPools", []),
         gcp_firecracker_node_min_count=(
             config.get_int("gcpFirecrackerNodeMinCount")
             if config.get("gcpFirecrackerNodeMinCount") is not None

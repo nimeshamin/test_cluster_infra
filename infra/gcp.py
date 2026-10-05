@@ -235,61 +235,28 @@ def create_gke_cluster(cfg: ClusterConfig) -> KubernetesCluster:
         gke_depends_on.append(gpu_node_pool)
 
     if cfg.gcp_firecracker_node_pool_enabled:
-        # Firecracker needs /dev/kvm. GKE exposes it through nested virtualization,
-        # which requires an Intel machine family. Ubuntu is used instead of COS so
-        # the host has a writable filesystem and the kvm/tun modules available.
-        firecracker_node_pool_args = {
-            "name": "firecracker",
-            "cluster": cluster.name,
-            "location": cfg.gcp_location,
-            "node_locations": [cfg.gcp_firecracker_zone],
-            "node_count": cfg.gcp_firecracker_node_min_count,
-            "autoscaling": {
-                "min_node_count": cfg.gcp_firecracker_node_min_count,
-                "max_node_count": cfg.gcp_firecracker_node_max_count,
-            },
-            "management": {"auto_repair": True, "auto_upgrade": True},
-            "upgrade_settings": {"max_surge": 1, "max_unavailable": 0},
-            "node_config": {
-                "machine_type": cfg.gcp_firecracker_machine_type,
-                "disk_size_gb": 100,
-                "disk_type": "pd-balanced",
-                "image_type": "UBUNTU_CONTAINERD",
-                "service_account": node_service_account.email,
-                "oauth_scopes": ["https://www.googleapis.com/auth/cloud-platform"],
-                "metadata": {"disable-legacy-endpoints": "true"},
-                "shielded_instance_config": {
-                    "enable_secure_boot": True,
-                    "enable_integrity_monitoring": True,
-                },
-                "workload_metadata_config": {"mode": "GKE_METADATA"},
-                "advanced_machine_features": {
-                    # SMT off: one thread per physical core, so vCPUs of
-                    # different tenants' microVMs never share a core's
-                    # caches and buffers (MDS/MMIO-stale-data class leaks).
-                    # Halves the visible vCPUs at the same price.
-                    "threads_per_core": 1,
-                    "enable_nested_virtualization": True,
-                },
-                "labels": {"firecracker": "true"},
-                "taints": [
-                    {"key": "firecracker", "value": "true", "effect": "NO_SCHEDULE"},
-                ],
-            },
-        }
-        if cfg.gcp_firecracker_local_ssd_count:
-            # Raw block devices (not formatted by GKE): firecracker-host turns the
-            # first one into the XFS reflink image store.
-            firecracker_node_pool_args["node_config"]["local_nvme_ssd_block_config"] = {
-                "local_ssd_count": cfg.gcp_firecracker_local_ssd_count,
-            }
-        if cfg.kubernetes_version:
-            firecracker_node_pool_args["version"] = cfg.kubernetes_version
-
-        firecracker_node_pool = gcp.container.NodePool(
-            "gke-firecracker-node-pool", **firecracker_node_pool_args
+        gke_depends_on.append(
+            _firecracker_node_pool(cfg, cluster, node_service_account, "gke-firecracker-node-pool", "firecracker")
         )
-        gke_depends_on.append(firecracker_node_pool)
+    # Pools dedicated to one tenant each: same Firecracker node shape, labelled
+    # node-restriction.kubernetes.io/fc-tenant=<tenant>. The control plane only
+    # places that tenant's VMs there (and that tenant's dedicated VMs only
+    # there). The prefix cannot be set by kubelets (NodeRestriction), so a
+    # compromised node cannot relabel itself to attract another tenant's VMs.
+    for pool in cfg.gcp_firecracker_dedicated_pools:
+        tenant = pool["tenant"]
+        gke_depends_on.append(
+            _firecracker_node_pool(
+                cfg,
+                cluster,
+                node_service_account,
+                f"gke-firecracker-{tenant}-node-pool",
+                f"fc-{tenant}"[:40],
+                tenant=tenant,
+                machine_type=pool.get("machineType"),
+                node_count=int(pool.get("nodeCount", 1)),
+            )
+        )
 
     client_config = gcp.organizations.get_client_config()
     cert = cluster.master_auth.apply(_gke_cluster_ca_certificate)
@@ -304,3 +271,71 @@ def create_gke_cluster(cfg: ClusterConfig) -> KubernetesCluster:
     )
 
     return KubernetesCluster(name=cluster.name, provider=provider, depends_on=gke_depends_on)
+
+
+def _firecracker_node_pool(
+    cfg: ClusterConfig,
+    cluster: gcp.container.Cluster,
+    node_service_account: gcp.serviceaccount.Account,
+    resource_name: str,
+    pool_name: str,
+    tenant: str | None = None,
+    machine_type: str | None = None,
+    node_count: int | None = None,
+) -> gcp.container.NodePool:
+    """A node pool for Firecracker microVMs, shared or dedicated to one tenant.
+
+    Firecracker needs /dev/kvm. GKE exposes it through nested virtualization,
+    which requires an Intel machine family. Ubuntu is used instead of COS so
+    the host has a writable filesystem and the kvm/tun modules available.
+    """
+    min_count = cfg.gcp_firecracker_node_min_count if node_count is None else node_count
+    max_count = cfg.gcp_firecracker_node_max_count if node_count is None else node_count
+    labels = {"firecracker": "true"}
+    if tenant:
+        labels["node-restriction.kubernetes.io/fc-tenant"] = tenant
+    args = {
+        "name": pool_name,
+        "cluster": cluster.name,
+        "location": cfg.gcp_location,
+        "node_locations": [cfg.gcp_firecracker_zone],
+        "node_count": min_count,
+        "autoscaling": {"min_node_count": min_count, "max_node_count": max_count},
+        "management": {"auto_repair": True, "auto_upgrade": True},
+        "upgrade_settings": {"max_surge": 1, "max_unavailable": 0},
+        "node_config": {
+            "machine_type": machine_type or cfg.gcp_firecracker_machine_type,
+            "disk_size_gb": 100,
+            "disk_type": "pd-balanced",
+            "image_type": "UBUNTU_CONTAINERD",
+            "service_account": node_service_account.email,
+            "oauth_scopes": ["https://www.googleapis.com/auth/cloud-platform"],
+            "metadata": {"disable-legacy-endpoints": "true"},
+            "shielded_instance_config": {
+                "enable_secure_boot": True,
+                "enable_integrity_monitoring": True,
+            },
+            "workload_metadata_config": {"mode": "GKE_METADATA"},
+            "advanced_machine_features": {
+                # SMT off: one thread per physical core, so vCPUs of different
+                # tenants' microVMs never share a core's caches and buffers
+                # (MDS/MMIO-stale-data class leaks). Halves the visible vCPUs at
+                # the same price.
+                "threads_per_core": 1,
+                "enable_nested_virtualization": True,
+            },
+            "labels": labels,
+            "taints": [
+                {"key": "firecracker", "value": "true", "effect": "NO_SCHEDULE"},
+            ],
+        },
+    }
+    if cfg.gcp_firecracker_local_ssd_count:
+        # Raw block devices (not formatted by GKE): firecracker-host turns the
+        # first one into the XFS reflink image store.
+        args["node_config"]["local_nvme_ssd_block_config"] = {
+            "local_ssd_count": cfg.gcp_firecracker_local_ssd_count,
+        }
+    if cfg.kubernetes_version:
+        args["version"] = cfg.kubernetes_version
+    return gcp.container.NodePool(resource_name, **args)
