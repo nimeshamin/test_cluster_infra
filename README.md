@@ -69,6 +69,7 @@ On this branch the `gcp` stack turns the GPU pool off, points both GitOps repos 
 - Pinned to a single zone (`gcpFirecrackerZone`, default `<gcpLocation>-a`) so the regional pool is one node, not one per zone.
 - The `primary` pool is also pinned to `us-central1-a` via `gcpNodeLocations` (2–4 nodes instead of 2–4 per zone); unset, GKE spreads it across every zone in the region.
 - Labelled `firecracker=true` and tainted `firecracker=true:NoSchedule`; only the `firecracker-host` DaemonSet from `test_cluster_k8s_base` tolerates it.
+- SMT disabled (`threads_per_core: 1`) so different tenants' vCPUs never share a physical core; an `n2-standard-4` then exposes 2 vCPUs.
 - One raw local NVMe SSD (`gcpFirecrackerLocalSsdCount`, 375 GB, `local_nvme_ssd_block_config`) that firecracker-host formats as the XFS (reflink) image store; with 0 it falls back to a loop-mounted file on the boot disk. Changing this replaces the node pool, and local SSD contents do not survive node recreation.
 
 | Key | Default | |

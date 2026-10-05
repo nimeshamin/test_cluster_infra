@@ -264,7 +264,11 @@ def create_gke_cluster(cfg: ClusterConfig) -> KubernetesCluster:
                 },
                 "workload_metadata_config": {"mode": "GKE_METADATA"},
                 "advanced_machine_features": {
-                    "threads_per_core": 2,
+                    # SMT off: one thread per physical core, so vCPUs of
+                    # different tenants' microVMs never share a core's
+                    # caches and buffers (MDS/MMIO-stale-data class leaks).
+                    # Halves the visible vCPUs at the same price.
+                    "threads_per_core": 1,
                     "enable_nested_virtualization": True,
                 },
                 "labels": {"firecracker": "true"},
