@@ -155,6 +155,29 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# The Kubernetes provider's kubeconfig embeds a gcloud access token from the
+# last `pulumi up`, valid for an hour. `pulumi destroy` does not rerun the
+# program, so it would use that expired token and fail with "configured
+# Kubernetes cluster is unreachable ... provide credentials". Update only the
+# provider first: a full `pulumi up` would also re-create the root Argo CD
+# Applications deleted above (and with them every app and its disks).
+provider=$(echo "$state" | python3 -c '
+import json, sys
+for r in json.load(sys.stdin)["deployment"].get("resources") or []:
+    if r["type"] == "pulumi:providers:kubernetes":
+        print(r["urn"])
+' | head -n1)
+if [[ -n "$provider" && "$reachable" == 1 ]]; then
+  step "Refreshing Pulumi's Kubernetes credentials"
+  if ! pulumi up --stack "$STACK" --yes --non-interactive --skip-preview --target "$provider" >/dev/null 2>&1; then
+    die "could not refresh the Kubernetes provider ($provider); run: pulumi up --stack $STACK --target '$provider'"
+  fi
+  info "provider credentials refreshed"
+elif [[ -n "$provider" ]]; then
+  info "cluster unreachable: if it is already deleted, rerun with PULUMI_K8S_DELETE_UNREACHABLE=true to drop its Kubernetes resources from the state"
+fi
+
+# ---------------------------------------------------------------------------
 step "Pulumi destroy"
 destroy_log=$(mktemp)
 set +e
